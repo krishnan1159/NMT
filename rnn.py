@@ -153,6 +153,7 @@ def rnn_process_one_batch(rnn_params : Dict, batch_src_embeddings : ArrayLike, b
     henc, _, _ = rnn_encoder_batch(rnn_params, batch_src_embeddings, batch_src_lengths)
     return rnn_decoder_batch(rnn_params, batch_tgt_embeddings, batch_tgt_lengths, batch_decoder_expected_tokens, henc)
 
+@jax.jit
 def train_one_batch(rnn_params : Dict, batch_src_tokens : ArrayLike, batch_src_lengths : ArrayLike, batch_tgt_tokens : ArrayLike, batch_tgt_lengths : ArrayLike, batch_tgt_next_tokens : ArrayLike, lr : float):
     batch_src_embeddings  = rnn_params["embeddings"]["source"][batch_src_tokens]
     batch_tgt_embeddings  = rnn_params["embeddings"]["target"][batch_tgt_tokens]
@@ -160,7 +161,6 @@ def train_one_batch(rnn_params : Dict, batch_src_tokens : ArrayLike, batch_src_l
     rnn_params = jax.tree.map(lambda p, g: p - lr * g, rnn_params, grads)
     return loss, rnn_params
 
-@partial(jax.jit, static_argnames=("batch_size",))
 def train_one_epoch(rnn_params : Dict, src_sents_tokens : ArrayLike, tgt_sents_tokens : ArrayLike, src_sents_lengths: ArrayLike, tgt_sents_lengths: ArrayLike, batch_size: int):
     num_sents = src_sents_tokens.shape[0]
     total_loss = 0.0
@@ -213,7 +213,7 @@ def train(src_sents_tokens : ArrayLike, src_sents_lengths: ArrayLike, tgt_sents_
     logger.info(f"JAX devices: {jax.devices()}")
     logger.info(f"JAX backend: {jax.default_backend()}")
     logger.info(f"local device count: {jax.local_device_count()}")
-    logger.info(f"device count: {jax.device_count}")
+    logger.info(f"device count: {jax.device_count()}")
 
     rnn_params = init_params(embedding_model.all_src_embeddings(), embedding_model.all_tgt_embeddings(), embed_size, hidden_size, tgt_vocab_size)
     embedding_params, encoder_params, decoder_params, total_params = total_parameters(rnn_params)
