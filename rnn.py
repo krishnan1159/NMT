@@ -211,8 +211,8 @@ def train(src_sents_tokens : ArrayLike, src_sents_lengths: ArrayLike, tgt_sents_
 
     logger.info(f"JAX devices: {jax.devices()}")
     logger.info(f"JAX backend: {jax.default_backend()}")
-    logger.info("local device count:", jax.local_device_count())
-    logger.info("device count:", jax.device_count())
+    logger.info(f"local device count: {jax.local_device_count()}")
+    logger.info(f"device count: {jax.device_count}")
 
     rnn_params = init_params(embedding_model.all_src_embeddings(), embedding_model.all_tgt_embeddings(), embed_size, hidden_size, tgt_vocab_size)
     embedding_params, encoder_params, decoder_params, total_params = total_parameters(rnn_params)

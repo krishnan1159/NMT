@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import sys
 
 
@@ -9,11 +9,25 @@ class TrainConfig:
     num_epochs: int
     batch_size: int
 
+
 def is_colab() -> bool:
     return "google.colab" in sys.modules
 
-def get_config() -> TrainConfig:
-    if is_colab():
-        return TrainConfig(embed_size=256, hidden_size=256, num_epochs=1000, batch_size=128)
 
-    return TrainConfig(embed_size=256, hidden_size=256, num_epochs=10, batch_size=64)
+def get_config(**overrides) -> TrainConfig:
+    if is_colab():
+        config = TrainConfig(
+            embed_size=256,
+            hidden_size=256,
+            num_epochs=1000,
+            batch_size=128,
+        )
+    else:
+        config = TrainConfig(
+            embed_size=256,
+            hidden_size=256,
+            num_epochs=10,
+            batch_size=64,
+        )
+
+    return replace(config, **overrides)
