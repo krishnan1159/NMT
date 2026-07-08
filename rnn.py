@@ -187,7 +187,6 @@ def train_one_epoch(rnn_params : Dict, src_sents_tokens : ArrayLike, tgt_sents_t
         total_tokens += jnp.sum(batch_tgt_lengths)
 
         loss, rnn_params = train_one_batch(rnn_params, batch_src_tokens, batch_src_lengths, batch_tgt_tokens, batch_tgt_lengths, batch_tgt_next_tokens, lr)
-        logger.info(f"Loss for the batch is {loss}")
         total_loss += loss
 
     return total_loss / total_tokens, rnn_params
