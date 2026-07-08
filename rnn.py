@@ -7,6 +7,7 @@ from typing import List, Dict
 from model_embedding import ModelEmbedding
 from vocab import Tokenizer
 from first_logger import FirstNLogger
+from config import TrainConfig
 import logging
 import time
 
@@ -201,10 +202,10 @@ def total_parameters(rnn_params : Dict) -> int:
     total_params = embedding_params + encoder_params + decoder_params
     return embedding_params, encoder_params, decoder_params, total_params
 
-def train(src_sents_tokens : ArrayLike, src_sents_lengths: ArrayLike, tgt_sents_tokens : ArrayLike, tgt_sents_lengths: ArrayLike, embedding_model: ModelEmbedding, tgt_vocab_size : int):
-    hidden_size = 128
-    embed_size = embedding_model.embed_size()
-    num_epochs = 10
+def train(src_sents_tokens : ArrayLike, src_sents_lengths: ArrayLike, tgt_sents_tokens : ArrayLike, tgt_sents_lengths: ArrayLike, embedding_model: ModelEmbedding, tgt_vocab_size : int, config: TrainConfig):
+    hidden_size = config.hidden_size
+    embed_size = config.embed_size
+    num_epochs = config.num_epochs
     loss = 0.0
 
     logger.info(f"JAX devices: {jax.devices()}")
