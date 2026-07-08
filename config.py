@@ -15,4 +15,4 @@ def get_config() -> TrainConfig:
     if is_colab():
         return TrainConfig(embed_size=128, hidden_size=128, num_epochs=10)
 
-    return TrainConfig(embed_size=1024, hidden_size=1024, num_epochs=1000)
+    return TrainConfig(embed_size=256, hidden_size=256, num_epochs=1000)

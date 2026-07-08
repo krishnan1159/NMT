@@ -5,6 +5,7 @@ description = "Neural machine translation experiments and utilities."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "datasets>=5.0.0",
     "ipykernel>=6.0.0",
     "jax>=0.10.2",
     "jax-mps>=0.10.8; sys_platform == 'darwin'",
