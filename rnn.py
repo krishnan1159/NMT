@@ -11,6 +11,7 @@ from config import TrainConfig
 import logging
 import time
 from functools import partial
+import optax
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)  # change to DEBUG when you want rnn.py logs.
@@ -52,6 +53,17 @@ if not logger.handlers:
         hₜ = tanh(uₜ)
 
 """
+
+LEARNING_RATE = 1e-2
+TRAINABLE_MASK = {
+    "embeddings": {"source": True, "target": True},
+    "encoder": True,
+    "decoder": True,
+}
+OPTIMIZER = optax.chain(
+    optax.clip_by_global_norm(1.0),
+    optax.masked(optax.adam(learning_rate=LEARNING_RATE), TRAINABLE_MASK),
+)
 
 def init_rnn_encoder_params(key, embed_size, hidden_size):
     k1, k2 = jax.random.split(key, 2)
@@ -154,14 +166,15 @@ def rnn_process_one_batch(rnn_params : Dict, batch_src_embeddings : ArrayLike, b
     return rnn_decoder_batch(rnn_params, batch_tgt_embeddings, batch_tgt_lengths, batch_decoder_expected_tokens, henc)
 
 @jax.jit
-def train_one_batch(rnn_params : Dict, batch_src_tokens : ArrayLike, batch_src_lengths : ArrayLike, batch_tgt_tokens : ArrayLike, batch_tgt_lengths : ArrayLike, batch_tgt_next_tokens : ArrayLike, lr : float):
+def train_one_batch(rnn_params : Dict, batch_src_tokens : ArrayLike, batch_src_lengths : ArrayLike, batch_tgt_tokens : ArrayLike, batch_tgt_lengths : ArrayLike, batch_tgt_next_tokens : ArrayLike, opt_state : optax.OptState):
     batch_src_embeddings  = rnn_params["embeddings"]["source"][batch_src_tokens]
     batch_tgt_embeddings  = rnn_params["embeddings"]["target"][batch_tgt_tokens]
     loss, grads = jax.value_and_grad(rnn_process_one_batch)(rnn_params, batch_src_embeddings, batch_src_lengths, batch_tgt_embeddings, batch_tgt_lengths, batch_tgt_next_tokens)
-    rnn_params = jax.tree.map(lambda p, g: p - lr * g, rnn_params, grads)
-    return loss, rnn_params
+    updates, opt_state = OPTIMIZER.update(grads, opt_state, rnn_params)
+    rnn_params = optax.apply_updates(rnn_params, updates)
+    return rnn_params, opt_state, loss
 
-def train_one_epoch(rnn_params : Dict, src_sents_tokens : ArrayLike, tgt_sents_tokens : ArrayLike, src_sents_lengths: ArrayLike, tgt_sents_lengths: ArrayLike, batch_size: int):
+def train_one_epoch(rnn_params : Dict, src_sents_tokens : ArrayLike, tgt_sents_tokens : ArrayLike, src_sents_lengths: ArrayLike, tgt_sents_lengths: ArrayLike, opt_state : optax.OptState, batch_size: int):
     num_sents = src_sents_tokens.shape[0]
     total_loss = 0.0
     total_tokens = 0
@@ -186,10 +199,10 @@ def train_one_epoch(rnn_params : Dict, src_sents_tokens : ArrayLike, tgt_sents_t
 
         total_tokens += jnp.sum(batch_tgt_lengths)
 
-        loss, rnn_params = train_one_batch(rnn_params, batch_src_tokens, batch_src_lengths, batch_tgt_tokens, batch_tgt_lengths, batch_tgt_next_tokens, lr)
+        rnn_params, opt_state, loss = train_one_batch(rnn_params, batch_src_tokens, batch_src_lengths, batch_tgt_tokens, batch_tgt_lengths, batch_tgt_next_tokens, opt_state)
         total_loss += loss
 
-    return total_loss / total_tokens, rnn_params
+    return rnn_params, opt_state, total_loss / total_tokens
 
 def total_parameters(rnn_params : Dict) -> int:
     embedding_leaves = jax.tree.leaves(rnn_params["embeddings"])
@@ -215,13 +228,18 @@ def train(src_sents_tokens : ArrayLike, src_sents_lengths: ArrayLike, tgt_sents_
     logger.info(f"device count: {jax.device_count()}")
 
     rnn_params = init_params(embedding_model.all_src_embeddings(), embedding_model.all_tgt_embeddings(), embed_size, hidden_size, tgt_vocab_size)
+
+    ## Count total no. of trainable params.
     embedding_params, encoder_params, decoder_params, total_params = total_parameters(rnn_params)
-    
     logger.info(f"RNN cumulative params : embedding = {embedding_params}, encoder = {encoder_params}, decoder = {decoder_params} and total = {total_params}");
 
-    for epoch in range(1, num_epochs + 1):
+    ## Initialize optax for adam and gradient clipping
+    opt_state = OPTIMIZER.init(rnn_params)
+
+    for epoch in range(0, num_epochs):
         start_time = time.perf_counter()
-        loss, rnn_params = train_one_epoch(rnn_params, src_sents_tokens, tgt_sents_tokens, src_sents_lengths, tgt_sents_lengths, batch_size)
+        rnn_params, opt_state, loss = train_one_epoch(rnn_params, src_sents_tokens, tgt_sents_tokens, src_sents_lengths, tgt_sents_lengths, opt_state, batch_size)
         loss.block_until_ready()
         elapsed = time.perf_counter() - start_time
-        logger.info(f"Loss at epoch {epoch}/{num_epochs} is {loss}. Time taken to train = {elapsed}")
+        if epoch % 10 == 0:
+            logger.info(f"Loss at epoch {epoch + 1}/{num_epochs} is {loss}. Time taken to train = {elapsed}")

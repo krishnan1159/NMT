@@ -24,10 +24,10 @@ def get_config(**overrides) -> TrainConfig:
         )
     else:
         config = TrainConfig(
-            embed_size=256,
-            hidden_size=256,
-            num_epochs=10,
-            batch_size=64,
+            embed_size=64,
+            hidden_size=64,
+            num_epochs=100,
+            batch_size=32,
         )
 
     return replace(config, **overrides)
